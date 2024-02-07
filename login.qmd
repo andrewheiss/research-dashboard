@@ -1,0 +1,93 @@
+---
+page-layout: full
+---
+
+```{=html}
+<div id="login-note"></div>
+<div id="logout-note"></div>
+
+<div class="grid">
+  <div class="g-col-12 g-col-md-6 g-start-0 g-start-md-4">
+    <form id="login">
+      <div class="mb-3">
+        <input type="text" id="username" class="form-control" placeholder="Name" aria-label="Name">
+      </div>
+      <div class="mb-3">
+        <input type="password" id="password" class="form-control" placeholder="Password" aria-label="Password">
+      </div>
+      <button type="submit" class="btn btn-primary">Submit</button>
+    </form>
+    <button id="logout-button" class="btn btn-danger mt-3">Logout</button>
+  </div>
+</div>
+
+<script>
+  document.getElementById('login').addEventListener('submit', function(event) {
+    event.preventDefault();
+
+    let login_note = document.getElementById('login-note');
+
+    var username = document.getElementById('username').value;
+    var password = document.getElementById('password').value;
+
+    fetch('https://api.andrewheiss.com/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        username: username,
+        password: password
+      })
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.token) {
+        localStorage.setItem('ath_token', data.token);
+        login_note.innerHTML = `
+          <div id="alertContainer" class="container mt-3">
+            <div class="alert alert-success" role="alert">
+                Logged in!
+            </div>
+          </div>
+        `;
+      } else {
+        throw new Error('No token in response');
+      }
+    })
+    .catch(function(error) {
+      console.log(error);
+      login_note.innerHTML = `
+        <div id="alertContainer" class="container mt-3">
+          <div class="alert alert-warning" role="alert">
+              Wrong username or password!
+          </div>
+        </div>
+      `;
+    });
+  });
+  
+  document.getElementById('logout-button').addEventListener('click', function() {
+    let logout_note = document.getElementById('logout-note');
+    
+    if(localStorage.getItem('ath_token') !== null) {
+        localStorage.removeItem('ath_token');
+        logout_note.innerHTML = `
+          <div id="alertContainer" class="container mt-3">
+            <div class="alert alert-success" role="alert">
+                Logged out!
+            </div>
+          </div>
+        `;
+    } else {
+        logout_note.innerHTML = `
+          <div id="alertContainer" class="container mt-3">
+            <div class="alert alert-warning" role="alert">
+                You're not logged in!
+            </div>
+          </div>
+        `;
+    }
+  });
+</script>
+```

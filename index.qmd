@@ -1,0 +1,147 @@
+---
+title: "Andrew Heiss Research Dashboard"
+execute:
+  echo: false
+  output: false
+format: dashboard
+include-before-body: 
+  text: |
+    <style>
+      #quarto-dashboard-header {
+        display: none;
+      }
+    </style>
+include-after-body: 
+  text: |
+    <script>
+    let token = localStorage.getItem('ath_token');
+    
+    if (!token) {
+        let mainContainer = document.getElementById('quarto-content');
+        mainContainer.insertAdjacentHTML('afterbegin', `
+          <div id="alertContainer" class="container mt-3">
+            <div class="alert alert-warning" role="alert">
+                You're not logged in
+            </div>
+          </div>
+        `);
+    }
+    </script>
+---
+
+```{ojs}
+import { aq, op } from "@uwdata/arquero"
+d3 = require("d3")
+
+token = localStorage.getItem('ath_token')
+
+results_raw = await fetch("https://api.andrewheiss.com/research_progress", {
+  body: "",
+  headers: {
+    "Authorization": `Bearer ${token}`,
+    "content-type": "application/json"
+  },
+  method: "POST",
+  mode: "cors"
+}).then(response => {
+  return response.json();
+})
+```
+
+```{ojs}
+// The on-hold projects don't have a score column, and Arquero infers the data 
+// frame schema based on the first element in the JSON data, so if the first 
+// element is an on-hold project, the score column is dropped (!), so I have to 
+// filter out the on-hold projects before converting this to an Arquero data frame
+results_raw.pipeline = results_raw.pipeline.filter(d => d.Status !== "On hold")
+
+pipeline = aq.from(results_raw.pipeline)
+
+scores = aq.from(results_raw.scores)
+  .filter(d => d.Status !== "On hold")
+
+// Extract an array of the scores for plot ordering
+score_order = scores
+  .select("Status_plot")
+  .objects()
+  .map(d => d.Status_plot)
+```
+
+```{ojs}
+pipeline_summary = pipeline
+  .rollup({
+    avg_score: d => op.mean(d.Score),
+    sd_score: d => op.stdev(d.Score),
+    count: d => op.count(),
+    total_points: d => op.sum(d.Score)
+  })
+  
+unfinished_summary = pipeline
+  .filter(d => d.Status !== "Accepted")
+  .rollup({
+    count: d => op.count()
+  })
+
+avg_score = pipeline_summary.get("avg_score").toFixed(2)
+sd_score = pipeline_summary.get("sd_score").toFixed(2)
+project_count = unfinished_summary.get("count")
+total_points = pipeline_summary.get("total_points")
+```
+
+## Stats row {height=25%}
+
+::: {.valuebox icon="list-check" color="success"}
+Unfinished projects
+
+${project_count}
+:::
+
+::: {.valuebox icon="bar-chart-fill" color="secondary"}
+Total points
+
+${total_points}
+:::
+
+::: {.valuebox icon="thermometer-half" color="info"}
+Average points
+
+${avg_score}
+:::
+
+## Graph row {height=75%}
+
+```{ojs}
+//| output: true
+Plot.plot({
+  marginLeft: 0,
+  marginBottom: 60,
+  x: {
+    label: "Status",
+    domain: score_order
+  },
+  y: {
+    label: "Count"
+  },
+  color: {
+    // From CARTOColors Prism: https://carto.com/carto-colors/
+    range: ["#5F4690", "#1D6996", "#38A6A5", "#0F8554", "#73AF48", "#EDAD08", "#E17C05", "#CC503E", "#94346E"]
+  },
+  marks: [
+    Plot.axisX({label: null, tickSize: 0, fontSize: 12, fontFamily: "Manrope"}),
+    Plot.axisY({label: null, ticks: 0, tickSize: 0}),
+    
+    Plot.barY(pipeline, {
+      x: "Status_plot",
+      y: 1,
+      fill: "Status",
+      stroke: "white",
+      strokeWidth: 2,
+      title: "Paper",
+      tip: {
+        fontSize: 14,
+        fontFamily: "Manrope"
+      }
+    })
+  ]
+})
+```

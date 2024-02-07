@@ -1,0 +1,31 @@
+project:
+  type: website
+  output-dir: _site
+  preview:
+    port: 4444
+
+website:
+  title: "Research"
+  favicon: assets/favicon.png
+  search: false
+  navbar:
+    background: "#1D6996"
+    left:
+      - text: "Pipeline"
+        file: index.qmd
+      - reading.qmd
+    right: 
+      - file: login.qmd
+        text: " "
+        icon: door-open
+      - href: https://airtable.com/appw9GaXRQ9sCEUtT/tblXj4OTLat3kWEAE/viwv5mrfFCjU1nbUO
+        icon: database
+      - href: https://airtable.com/appw9GaXRQ9sCEUtT/pagMKJmEL06xVNmBP/form
+        icon: journal-plus
+
+format:
+  html:
+    page-layout: full
+    theme:
+      - zephyr
+      - custom.scss

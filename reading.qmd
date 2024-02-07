@@ -1,0 +1,140 @@
+---
+title: "Paper reading"
+execute:
+  echo: false
+  output: false
+include-before-body: 
+  text: |
+    <style>
+      h1.title {
+        display: none;
+      }
+    </style>
+---
+
+```{ojs}
+import { aq, op } from "@uwdata/arquero"
+d3 = require("d3")
+
+results_raw = await fetch("https://api.andrewheiss.com/research_reading")
+  .then(response => {
+    return response.json();
+  })
+
+papers_by_week = aq.from(results_raw.papers_by_week)
+  .derive({year_week_day: d => op.parse_date(d.year_week_day)})
+```
+
+::: {.callout-tip}
+### 2024 reading goals!
+I have a goal to read at least two academic articles every week in 2024 to work through the massive backlog of PDFs in my multiple "To Read" Zotero folders. Here's where I'm tracking my progress.
+:::
+
+:::: {.card .mb-3}
+
+::: {.card-body}
+
+```{ojs}
+//| output: true
+Plot.plot({
+  marginLeft: 20,
+  marginBottom: 40,
+  width: Math.max(width, 700),
+  // height: Math.max(width, 700)/1.5,
+  // width: width,
+
+  x: {
+    label: "Week"
+  },
+
+  y: {
+    label: "Papers read",
+  },
+
+  marks: [
+    Plot.axisX({label: null, fontSize: 16, fontFamily: "Manrope"}),
+    
+    Plot.ruleY([0]),
+    Plot.axisY({label: null, ticks: 0, tickSize: 0}),
+    
+    Plot.ruleY([2], {stroke: "#E17C05", strokeDasharray: "3,2"}),
+    
+    Plot.rectY(papers_by_week, {
+      x: "year_week_day",
+      y: "total",
+      fill: "#0F8554",
+      interval: d3.utcWeek,
+      tip: {
+        format: {
+          x: true,
+          y: true
+        },
+        fontSize: 14,
+        fontFamily: "Manrope"
+      }
+    })
+  ]
+})
+```
+
+:::
+::::
+
+```{ojs}
+table_settings = {
+  return {
+    sort: "date_actual",
+    reverse: true,
+    rows: 11.5,
+    layout: "auto",
+    columns: [
+      "week_num",
+      "date_actual",
+      "doi_or_url",
+      "citekey",
+      "title",
+      "author"
+    ],
+    header: {
+      week_num: "Week",
+      date_actual: "Date",
+      doi_or_url: "URL",
+      citekey: "Cite key",
+      title: "Title",
+      author: "Author"
+    },
+    format: {
+      date_actual: x => {
+        let date = new Date(x);
+        return date.toLocaleString('en-US', {
+          weekday: "long",
+          month: "long",
+          day: "numeric",
+          year: "numeric"
+        });
+      },
+      doi_or_url: url => url ? htl.html`<a href="${url}" target="_blank">${url}</a>` : ""
+    }
+  }
+}
+```
+
+:::: {.card}
+
+::: {.card-body}
+
+```{ojs}
+//| output: true
+//| classes: search-bar
+viewof search_table = Inputs.search(results_raw.papers)
+```
+
+```{ojs}
+//| output: true
+//| classes: article-table
+Inputs.table(search_table, table_settings)
+```
+
+:::
+::::
+
