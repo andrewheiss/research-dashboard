@@ -13,16 +13,14 @@ include-before-body:
 ---
 
 ```{ojs}
-import { aq, op } from "@uwdata/arquero"
 d3 = require("d3")
 
-results_raw = await fetch("https://api.andrewheiss.com/research_reading")
-  .then(response => {
-    return response.json();
-  })
-
-papers_by_week = aq.from(results_raw.papers_by_week)
-  .derive({year_week_day: d => op.parse_date(d.year_week_day)})
+papers = await fetch("https://api.andrewheiss.com/research_reading")
+  .then(response => response.json())
+  .then(data => data.map(d => ({
+    ...d,  // Keep all existing elements in the array
+    timestamp: new Date(d.timestamp)  // Parse the date element as a date
+  })))
 ```
 
 ::: {.callout-tip}
@@ -36,43 +34,62 @@ I have a goal to read at least two academic articles every week in 2024 to work 
 
 ```{ojs}
 //| output: true
+//| label: papers-by-week
 Plot.plot({
+  style: {
+    fontSize: "16px",
+    fontFamily: "Manrope",
+    maxWidth: "1300px",
+    overflow: "scroll"
+  },
+  
   marginLeft: 20,
   marginBottom: 40,
-  width: Math.max(width, 700),
-  // height: Math.max(width, 700)/1.5,
-  // width: width,
+  // width,
+  width: 1300,
 
   x: {
-    label: "Week"
+    label: "Week",
+    domain: [new Date("2024-01-01"), new Date("2024-12-31")]
   },
 
   y: {
     label: "Papers read",
   },
-
+  
   marks: [
-    Plot.axisX({label: null, fontSize: 16, fontFamily: "Manrope"}),
+    Plot.axisX({label: null}),
     
     Plot.ruleY([0]),
     Plot.axisY({label: null, ticks: 0, tickSize: 0}),
     
     Plot.ruleY([2], {stroke: "#E17C05", strokeDasharray: "3,2"}),
     
-    Plot.rectY(papers_by_week, {
-      x: "year_week_day",
-      y: "total",
-      fill: "#0F8554",
-      interval: d3.utcWeek,
-      tip: {
-        format: {
-          x: true,
-          y: true
-        },
-        fontSize: 14,
-        fontFamily: "Manrope"
-      }
-    })
+    Plot.rectY(papers, 
+      Plot.binX(
+        {y: "count"},  // Reducing function
+        {
+          x: "timestamp", 
+          y: "total", 
+          fill: "#A52C60",
+          interval: d3.utcWeek,
+          tip: {
+            format: {
+              // Format as nice date + remove 2 spaces for things like "January  2"
+              x: (d) => d3.utcFormat("%B %e")(d).replace(/  +/g, ' '),
+              y: true
+            },
+            fontSize: 14
+          }
+        }
+      ),
+    ),
+    
+    // Add glowy line for current date
+    Plot.ruleX(
+      [new Date()],
+      {stroke: "#EDAD08", strokeWidth: 2, imageFilter: "drop-shadow(1px 1px 2px white)"}
+    ),
   ]
 })
 ```
@@ -83,13 +100,13 @@ Plot.plot({
 ```{ojs}
 table_settings = {
   return {
-    sort: "date_actual",
+    sort: "timestamp",
     reverse: true,
     rows: 11.5,
     layout: "auto",
     columns: [
       "week_num",
-      "date_actual",
+      "timestamp",
       "doi_or_url",
       "citekey",
       "title",
@@ -97,14 +114,14 @@ table_settings = {
     ],
     header: {
       week_num: "Week",
-      date_actual: "Date",
+      timestamp: "Date",
       doi_or_url: "URL",
       citekey: "Cite key",
       title: "Title",
       author: "Author"
     },
     format: {
-      date_actual: x => {
+      timestamp: x => {
         let date = new Date(x);
         return date.toLocaleString('en-US', {
           weekday: "long",
@@ -126,7 +143,7 @@ table_settings = {
 ```{ojs}
 //| output: true
 //| classes: search-bar
-viewof search_table = Inputs.search(results_raw.papers)
+viewof search_table = Inputs.search(papers)
 ```
 
 ```{ojs}
@@ -138,3 +155,33 @@ Inputs.table(search_table, table_settings)
 :::
 ::::
 
+```{=html}
+<script type="application/javascript">
+function scroll_if_rendered() {
+  // #papers-by-week should have an svg element in it when it's fully rendered
+  const plot_object = document.querySelector("#papers-by-week svg");
+
+  if (plot_object) {
+    // The plot has been rendered, scroll to the current date
+    const currentDate = new Date();
+    const startDate = new Date("2024-01-01");
+    const endDate = new Date("2024-12-31");
+    const totalWidth = 1300;  // This should be the same as what's in #papers-by-week above
+    const position = totalWidth * ((currentDate - startDate) / (endDate - startDate));
+    
+    // Get the plot container
+    const plot_container = document.getElementById("papers-by-week");
+
+    // Only scroll if the position is larger than the viewable width of the plot container
+    if (position > plot_container.clientWidth) {
+      plot_container.scrollLeft = position;
+    }
+  } else {
+    // The plot has not been rendered yet, check again in 100 milliseconds
+    setTimeout(scroll_if_rendered, 100);
+  }
+}
+
+scroll_if_rendered();
+</script>
+```
